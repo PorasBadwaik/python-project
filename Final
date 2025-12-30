@@ -1,0 +1,157 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+import webbrowser
+from datetime import datetime
+
+# --- DATA STORAGE (Global) ---
+exams = []      # List of dicts: {"sub": "", "date": ""}
+resources = []  # List of dicts: {"sub": "", "link": ""}
+stats = {}      # Dict: {"Subject": {"hours": 0, "marks": 0}}
+
+# ================= FUNCTIONALITY =================
+
+def add_exam():
+    try:
+        sub_name = entry_exam_sub.get()
+        date_str = entry_exam_date.get()
+        
+        if not sub_name or not date_str:
+            messagebox.showwarning("Input Error", "Please fill in all fields")
+            return
+
+        date_obj = datetime.strptime(date_str, "%d-%m-%Y")
+        days_left = (date_obj - datetime.now()).days + 1
+        
+        exams.append({"sub": sub_name, "days": days_left})
+        refresh_exams()
+        
+        entry_exam_sub.delete(0, tk.END)
+        entry_exam_date.delete(0, tk.END)
+    except ValueError:
+        messagebox.showerror("Error", "Use format: DD-MM-YYYY")
+
+def refresh_exams():
+    # Clear current tree view
+    for i in tree_exam.get_children(): 
+        tree_exam.delete(i)
+    # Insert updated data
+    for e in exams:
+        tree_exam.insert("", "end", values=(e["sub"], e["days"]))
+
+def add_res():
+    s, l = entry_res_sub.get(), entry_res_link.get()
+    if s and l:
+        listbox_res.insert(tk.END, f"{s} -> {l}")
+        entry_res_sub.delete(0, tk.END)
+        entry_res_link.delete(0, tk.END)
+    else:
+        messagebox.showwarning("Input Error", "Please provide both Subject and URL")
+
+def open_link(event):
+    try:
+        selected_text = listbox_res.get(tk.ACTIVE)
+        url = selected_text.split(" -> ")[1]
+        webbrowser.open(url)
+    except IndexError:
+        pass
+
+def update_stats():
+    try:
+        sub = entry_stat_sub.get()
+        h = float(entry_stat_hrs.get())
+        m = float(entry_stat_marks.get())
+        
+        if sub in stats:
+            stats[sub]["hours"] += h
+            stats[sub]["marks"] = m
+        else:
+            stats[sub] = {"hours": h, "marks": m}
+        
+        show_analysis()
+    except ValueError:
+        messagebox.showerror("Error", "Enter valid numbers for Hours and Marks")
+
+def show_analysis():
+    text_stat_display.config(state='normal')
+    text_stat_display.delete('1.0', tk.END)
+    for sub, data in stats.items():
+        roi = round(data["marks"] / data["hours"], 2) if data["hours"] > 0 else 0
+        text_stat_display.insert(tk.END, f"Subject: {sub} | ROI: {roi} Marks/Hr\n")
+    text_stat_display.config(state='disabled')
+
+# ================= UI SETUP =================
+
+root = tk.Tk()
+root.title("CSBS Student Suite (Lite)")
+root.geometry("600x550")
+
+# --- TAB CONTROL ---
+tabs = ttk.Notebook(root)
+tab1 = ttk.Frame(tabs)
+tab2 = ttk.Frame(tabs)
+tab3 = ttk.Frame(tabs)
+
+tabs.add(tab1, text="📅 Scheduler")
+tabs.add(tab2, text="📚 Resources")
+tabs.add(tab3, text="📈 Analytics")
+tabs.pack(expand=1, fill="both")
+
+# --- TAB 1: SCHEDULER ---
+f1 = ttk.Frame(tab1, padding=10)
+f1.pack(fill="x")
+
+ttk.Label(f1, text="Subject:").grid(row=0, column=0, sticky="w")
+entry_exam_sub = ttk.Entry(f1)
+entry_exam_sub.grid(row=0, column=1, pady=2)
+
+ttk.Label(f1, text="Date (DD-MM-YYYY):").grid(row=1, column=0, sticky="w")
+entry_exam_date = ttk.Entry(f1)
+entry_exam_date.grid(row=1, column=1, pady=2)
+
+ttk.Button(f1, text="Add Exam", command=add_exam).grid(row=2, columnspan=2, pady=10)
+
+tree_exam = ttk.Treeview(tab1, columns=("Sub", "Days"), show='headings', height=8)
+tree_exam.heading("Sub", text="Subject")
+tree_exam.heading("Days", text="Days Remaining")
+tree_exam.pack(padx=10, fill="both")
+
+# --- TAB 2: RESOURCES ---
+f2 = ttk.Frame(tab2, padding=10)
+f2.pack(fill="x")
+
+ttk.Label(f2, text="Subject:").grid(row=0, column=0)
+entry_res_sub = ttk.Entry(f2)
+entry_res_sub.grid(row=0, column=1)
+
+ttk.Label(f2, text="URL Link:").grid(row=1, column=0)
+entry_res_link = ttk.Entry(f2)
+entry_res_link.grid(row=1, column=1)
+
+ttk.Button(f2, text="Save Link", command=add_res).grid(row=2, columnspan=2, pady=5)
+
+listbox_res = tk.Listbox(tab2)
+listbox_res.pack(padx=10, fill="both", expand=True)
+listbox_res.bind('<Double-1>', open_link)
+
+# --- TAB 3: ANALYTICS ---
+f3 = ttk.Frame(tab3, padding=10)
+f3.pack(fill="x")
+
+ttk.Label(f3, text="Subject:").grid(row=0, column=0)
+entry_stat_sub = ttk.Entry(f3)
+entry_stat_sub.grid(row=0, column=1)
+
+ttk.Label(f3, text="Hours Studied:").grid(row=1, column=0)
+entry_stat_hrs = ttk.Entry(f3)
+entry_stat_hrs.grid(row=1, column=1)
+
+ttk.Label(f3, text="Marks Obtained:").grid(row=2, column=0)
+entry_stat_marks = ttk.Entry(f3)
+entry_stat_marks.grid(row=2, column=1)
+
+ttk.Button(f3, text="Update Stats", command=update_stats).grid(row=3, columnspan=2, pady=5)
+
+text_stat_display = tk.Text(tab3, height=10, state='disabled')
+text_stat_display.pack(padx=10, pady=10, fill="both")
+
+root.mainloop()
